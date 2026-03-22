@@ -1,0 +1,91 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: schedules
+    // Document ID: auto-generated
+    // Fields:
+    //   - uid: string (required, immutable) - The user ID of the owner
+    //   - name: string (required) - Name of the schedule (max 100 chars)
+    //   - createdAt: timestamp (required, immutable) - Creation timestamp
+    //   - updatedAt: timestamp (required) - Last update timestamp
+    //   - data: string (required) - JSON stringified array of mapped slots (max 1MB)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isBUAdmin() {
+      // Allow @bu.ac.th domain OR the specific testing email provided in context
+      return isAuthenticated() && (request.auth.token.email.matches('.*@bu\\.ac\\.th') || request.auth.token.email == 'bulearning004@gmail.com');
+    }
+
+    function isOwner(uid) {
+      return isBUAdmin() && request.auth.uid == uid;
+    }
+
+    function isDocOwner() {
+      return isBUAdmin() && request.auth.uid == resource.data.uid;
+    }
+
+    function uidUnchanged() {
+      return !('uid' in request.resource.data) || request.resource.data.uid == request.auth.uid;
+    }
+
+    function uidNotModified() {
+      return !('uid' in request.resource.data) || request.resource.data.uid == resource.data.uid;
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function validStringLength(field, minLen, maxLen) {
+      return request.resource.data[field] is string &&
+        request.resource.data[field].size() >= minLen &&
+        request.resource.data[field].size() <= maxLen;
+    }
+
+    function areImmutableFieldsUnchanged(fields) {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(fields);
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+    function isValidSchedule(data) {
+      return hasOnlyAllowedFields(['uid', 'name', 'createdAt', 'updatedAt', 'data']) &&
+             validStringLength('uid', 1, 128) &&
+             validStringLength('name', 1, 100) &&
+             request.resource.data.createdAt is timestamp &&
+             request.resource.data.updatedAt is timestamp &&
+             validStringLength('data', 2, 1000000); // Up to ~1MB JSON string
+    }
+
+    match /schedules/{scheduleId} {
+      allow read: if isDocOwner();
+      allow create: if isBUAdmin() && 
+                    hasRequiredFields(['uid', 'name', 'createdAt', 'updatedAt', 'data']) &&
+                    isValidSchedule(request.resource.data) && 
+                    uidUnchanged();
+      allow update: if isDocOwner() && 
+                    isValidSchedule(request.resource.data) && 
+                    uidNotModified() &&
+                    areImmutableFieldsUnchanged(['createdAt']);
+      allow delete: if isDocOwner();
+    }
+  }
+}

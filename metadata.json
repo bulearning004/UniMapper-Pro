@@ -1,0 +1,5 @@
+{
+  "name": "UniSchedule Precision Mapper",
+  "description": "Map university schedules to fixed time slots and export to Word.",
+  "requestFramePermissions": []
+}

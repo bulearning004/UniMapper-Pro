@@ -1,0 +1,23 @@
+{
+  "entities": {
+    "Schedule": {
+      "title": "Schedule",
+      "description": "A user's mapped schedule",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "The user ID of the owner" },
+        "name": { "type": "string", "description": "Name of the schedule" },
+        "createdAt": { "type": "timestamp", "description": "Creation timestamp" },
+        "updatedAt": { "type": "timestamp", "description": "Last update timestamp" },
+        "data": { "type": "string", "description": "JSON stringified array of mapped slots" }
+      },
+      "required": ["uid", "name", "createdAt", "updatedAt", "data"]
+    }
+  },
+  "firestore": {
+    "schedules/{scheduleId}": {
+      "schema": { "$ref": "#/entities/Schedule" },
+      "description": "Schedules mapped by users"
+    }
+  }
+}
